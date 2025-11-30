@@ -12,6 +12,7 @@ export interface Annotation {
   start: number;
   end: number;
   noteText: string;
+  snippet?: string;
   kind?: "rewrite" | "question" | "source" | "fact_check" | "style" | "other";
   createdAt: number;
 }

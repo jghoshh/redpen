@@ -11,7 +11,11 @@ interface AssistantMessageViewProps {
   annotations: Annotation[];
   messagePlainText: string;
   isAnnotateMode: boolean;
-  onSelectRange: (range: { start: number; end: number }, position: SelectionPosition) => void;
+  onSelectRange: (
+    range: { start: number; end: number },
+    position: SelectionPosition,
+    selectedText: string
+  ) => void;
   onClearSelection: () => void;
   onAnnotationClick: (id: string) => void;
   pulseAnnotationId?: string | null;
@@ -71,7 +75,9 @@ export function AssistantMessageView({
       left: rect.left + window.scrollX + rect.width / 2,
     };
 
-    onSelectRange(offsets, position);
+    const selectedText = selection.toString();
+
+    onSelectRange(offsets, position, selectedText);
   };
 
   const segments = buildSegments(messagePlainText, annotations);
@@ -92,7 +98,6 @@ export function AssistantMessageView({
             segment.annotation ? (
               <span
                 key={`${segment.annotation.id}-${index}`}
-                className="annotated-passage"
                 data-annotation-id={segment.annotation.id}
                 data-char-start={segment.annotation.start}
                 data-char-end={segment.annotation.end}

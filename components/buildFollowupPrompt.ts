@@ -11,7 +11,11 @@ export function buildFollowupPrompt(
   const sorted = [...annotations].sort((a, b) => a.start - b.start);
   const items = sorted
     .map((annotation, index) => {
-      const passageRaw = messagePlainText.slice(annotation.start, annotation.end);
+      const passageSource =
+        annotation.snippet && annotation.snippet.length
+          ? annotation.snippet
+          : messagePlainText.slice(annotation.start, annotation.end);
+      const passageRaw = passageSource;
       const passage =
         passageRaw.length > 160 ? `${passageRaw.slice(0, 157)}...` : passageRaw;
       const cleanPassage = passage.replace(/\s+/g, " ").trim();

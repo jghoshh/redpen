@@ -5,7 +5,6 @@ import { AssistantMessage, Annotation } from "./types";
 import { AssistantMessageView } from "./AssistantMessageView";
 import { InlineNoteToolbar } from "./InlineNoteToolbar";
 import { ChatComposer } from "./ChatComposer";
-import { buildFollowupPrompt } from "./buildFollowupPrompt";
 
 function stripHtmlToPlainText(html: string): string {
   const withBreaks = html
@@ -49,8 +48,8 @@ export function ChatExperience() {
   const [pulseAnnotationId, setPulseAnnotationId] = useState<string | null>(null);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
+  const [selectedText, setSelectedText] = useState<string>("");
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
-  const lastAutoPromptRef = useRef<string>("");
 
   const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
   const isAnnotateMode = true;
@@ -62,35 +61,51 @@ export function ChatExperience() {
     setSelectionError(null);
     setEditingAnnotationId(null);
     setToolbarMode("cta");
+    setSelectedText("");
     const selection = window.getSelection();
     selection?.removeAllRanges();
   };
 
   const handleSelectRange = (
     range: { start: number; end: number },
-    position: { top: number; left: number }
+    position: { top: number; left: number },
+    selected: string
   ) => {
-    if (annotations.some((ann) => range.start < ann.end && range.end > ann.start)) {
-      setSelectionError("Selection overlaps an existing note");
-      setToolbarPosition(position);
-      setPendingRange(null);
-      return;
-    }
+    const overlapping = annotations.find(
+      (ann) => range.start < ann.end && range.end > ann.start
+    );
 
     setSelectionError(null);
     setPendingRange(range);
     setToolbarPosition(position);
-    setToolbarNoteText("");
-    setToolbarMode("cta");
+    setToolbarMode(overlapping ? "note" : "cta");
+    setEditingAnnotationId(overlapping ? overlapping.id : null);
+    setToolbarNoteText(overlapping ? overlapping.noteText : "");
+    setSelectedText(overlapping?.snippet ?? selected);
   };
 
   const saveAnnotation = () => {
     if (!pendingRange) return;
     const trimmed = toolbarNoteText.trim();
+    const snippetFromSelection = selectedText.trim();
+    const snippetFromRange =
+      pendingRange ? messagePlainText.slice(pendingRange.start, pendingRange.end) : "";
+    const snippet =
+      snippetFromSelection.length > 0
+        ? snippetFromSelection
+        : snippetFromRange.length > 0
+        ? snippetFromRange
+        : "";
     if (editingAnnotationId) {
       setAnnotations((current) =>
         current.map((annotation) =>
-          annotation.id === editingAnnotationId ? { ...annotation, noteText: trimmed } : annotation
+          annotation.id === editingAnnotationId
+            ? {
+                ...annotation,
+                noteText: trimmed,
+                snippet: snippet || annotation.snippet || snippetFromRange,
+              }
+            : annotation
         )
       );
     } else {
@@ -100,6 +115,7 @@ export function ChatExperience() {
         start: pendingRange.start,
         end: pendingRange.end,
         noteText: trimmed,
+        snippet,
         createdAt: Date.now(),
       };
       setAnnotations((current) => [...current, newAnnotation]);
@@ -115,28 +131,6 @@ export function ChatExperience() {
     setAnnotations((current) => current.filter((annotation) => annotation.id !== id));
     clearSelection();
   };
-
-  useEffect(() => {
-    if (!annotations.length) {
-      const lastAuto = lastAutoPromptRef.current;
-      setComposerValue((current) => (current === lastAuto ? "" : current));
-      lastAutoPromptRef.current = "";
-      return;
-    }
-
-    const nextPrompt = buildFollowupPrompt(annotations, messagePlainText);
-    setComposerValue((current) => {
-      const lastAuto = lastAutoPromptRef.current;
-      if (!current || current === lastAuto) {
-        return nextPrompt;
-      }
-      if (lastAuto && current.startsWith(lastAuto)) {
-        return nextPrompt + current.slice(lastAuto.length);
-      }
-      return nextPrompt;
-    });
-    lastAutoPromptRef.current = nextPrompt;
-  }, [annotations, messagePlainText]);
 
   const focusAnnotation = (id: string) => {
     const element = document.querySelector<HTMLElement>(`[data-annotation-id="${id}"]`);
@@ -163,6 +157,7 @@ export function ChatExperience() {
       setToolbarNoteText(annotation?.noteText ?? "");
       setEditingAnnotationId(id);
       setToolbarMode("note");
+      setSelectedText(annotation?.snippet ?? "");
       element.scrollIntoView({ behavior: "smooth", block: "center" });
       setPulseAnnotationId(id);
     }
@@ -221,6 +216,9 @@ export function ChatExperience() {
           onChange={setComposerValue}
           onSend={sendPrompt}
           textareaRef={composerRef}
+          annotations={annotations}
+          messagePlainText={messagePlainText}
+          onDeleteAnnotation={deleteAnnotation}
         />
       </div>
     </main>
