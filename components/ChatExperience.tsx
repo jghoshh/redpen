@@ -38,7 +38,7 @@ const SAMPLE_MESSAGE: AssistantMessage = {
 const HELLO_TEXT = "hello, is this the chat redpen demo?";
 
 export function ChatExperience() {
-  const [message] = useState<AssistantMessage>(SAMPLE_MESSAGE);
+  const [message, setMessage] = useState<AssistantMessage>(SAMPLE_MESSAGE);
   const [annotations, setAnnotations] = useState<Annotation[]>(message.annotations ?? []);
   const [pendingRange, setPendingRange] = useState<{ start: number; end: number } | null>(null);
   const [toolbarPosition, setToolbarPosition] = useState<{ top: number; left: number } | null>(null);
@@ -49,6 +49,10 @@ export function ChatExperience() {
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
   const [selectedText, setSelectedText] = useState<string>("");
+  const [conversation, setConversation] = useState<{ role: "user" | "assistant"; content: string }[]>(
+    [{ role: "assistant", content: stripHtmlToPlainText(SAMPLE_MESSAGE.html) }]
+  );
+  const [isSending, setIsSending] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
@@ -163,7 +167,60 @@ export function ChatExperience() {
     }
   };
 
-  const sendPrompt = () => {};
+  const sendPrompt = () => {
+    if (isSending) return;
+    const userText = composerValue.trim();
+    const noteContext =
+      annotations.length > 0
+        ? annotations
+            .slice()
+            .sort((a, b) => a.start - b.start)
+            .map((ann, idx) => {
+              const snippet =
+                ann.snippet && ann.snippet.length
+                  ? ann.snippet
+                  : messagePlainText.slice(ann.start, ann.end);
+              const note = ann.noteText.trim();
+              return `${idx + 1}) "${snippet}"${note ? ` — ${note}` : ""}`;
+            })
+            .join("\n")
+        : "";
+
+    const fullUserMessage = [userText, noteContext ? `Notes:\n${noteContext}` : ""]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (!fullUserMessage) return;
+
+    setIsSending(true);
+    const nextConversation = [...conversation, { role: "user" as const, content: fullUserMessage }];
+
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: nextConversation }),
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to reach model");
+        const data = await res.json();
+        const assistantText: string = data?.message ?? "";
+        if (!assistantText) throw new Error("Empty response");
+
+        const assistantHtml = textToHtml(assistantText);
+        const newMessage: AssistantMessage = { id: generateId(), html: assistantHtml };
+
+        setConversation([...nextConversation, { role: "assistant", content: assistantText }]);
+        setMessage(newMessage);
+        setAnnotations([]);
+        setComposerValue("");
+        setToolbarMode("cta");
+        setSelectedText("");
+      })
+      .catch(() => {
+        // ignore errors for now
+      })
+      .finally(() => setIsSending(false));
+  };
 
   useEffect(() => {
     if (!toolbarPosition) return;
@@ -221,4 +278,10 @@ export function ChatExperience() {
       </div>
     </main>
   );
+}
+
+function textToHtml(text: string): string {
+  const paragraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (!paragraphs.length) return `<p>${text}</p>`;
+  return paragraphs.map((p) => `<p>${p}</p>`).join("");
 }

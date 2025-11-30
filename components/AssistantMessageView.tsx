@@ -103,10 +103,10 @@ export function AssistantMessageView({
                 data-char-end={segment.annotation.end}
                 onClick={() => onAnnotationClick(segment.annotation!.id)}
               >
-                {renderTextWithBreaks(segment.text)}
+                {segment.text}
               </span>
             ) : (
-              <span key={`plain-${index}`}>{renderTextWithBreaks(segment.text)}</span>
+              <span key={`plain-${index}`}>{segment.text}</span>
             )
           )}
         </div>
@@ -115,45 +115,20 @@ export function AssistantMessageView({
   );
 }
 
-function renderTextWithBreaks(text: string) {
-  const paragraphs = text
-    .split(/\n+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  return paragraphs.flatMap((para, pIndex) => {
-    const lines = para.split("\n");
-    const content = lines.flatMap((line, lIndex) =>
-      lIndex === 0 ? [line] : [<br key={`br-${pIndex}-${lIndex}`} />, line]
-    );
-    const spacer =
-      pIndex < paragraphs.length - 1 ? (
-        <span aria-hidden="true" className="paragraph-spacer" key={`spacer-${pIndex}`} />
-      ) : null;
-    return [
-      <span key={`para-${pIndex}`} className="message-paragraph">
-        {content}
-      </span>,
-      spacer,
-    ].filter(Boolean);
-  });
-}
-
 function getOffsetsFromRange(
   container: HTMLElement,
   range: Range
 ): { start: number; end: number } | null {
   try {
-    const preRange = document.createRange();
-    preRange.setStart(container, 0);
+    const measure = (node: Node, offset: number) => {
+      const r = document.createRange();
+      r.setStart(container, 0);
+      r.setEnd(node, offset);
+      return r.toString().length;
+    };
 
-    const startRange = preRange.cloneRange();
-    startRange.setEnd(range.startContainer, range.startOffset);
-    const start = startRange.toString().length;
-
-    const endRange = preRange.cloneRange();
-    endRange.setEnd(range.endContainer, range.endOffset);
-    const end = endRange.toString().length;
+    const start = measure(range.startContainer, range.startOffset);
+    const end = measure(range.endContainer, range.endOffset);
 
     return start <= end ? { start, end } : { start: end, end: start };
   } catch {

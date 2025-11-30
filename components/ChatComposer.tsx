@@ -8,6 +8,7 @@ interface ChatComposerProps {
   annotations?: { id: string; start: number; end: number; noteText: string; snippet?: string }[];
   messagePlainText?: string;
   onDeleteAnnotation?: (id: string) => void;
+  isSending?: boolean;
 }
 
 export function ChatComposer({
@@ -18,6 +19,7 @@ export function ChatComposer({
   annotations = [],
   messagePlainText = "",
   onDeleteAnnotation,
+  isSending = false,
 }: ChatComposerProps) {
   const truncate = (text: string, limit: number) =>
     text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
@@ -35,7 +37,7 @@ export function ChatComposer({
         : messagePlainText.slice(annotation.start, annotation.end);
 
     const snippet = truncate(snippetRaw, 90);
-    const note = truncate(noteRaw || "", 120);
+    const note = truncate(noteRaw || "", 60);
 
     return { snippet, note };
   };
@@ -81,7 +83,13 @@ export function ChatComposer({
       />
       <div className="composer-actions">
         <div className="composer-actions-right">
-          <button className="send-circle" onClick={onSend} type="button" aria-label="Send">
+          <button
+            className="send-circle"
+            onClick={onSend}
+            type="button"
+            aria-label="Send"
+            disabled={isSending}
+          >
             ↑
           </button>
         </div>
