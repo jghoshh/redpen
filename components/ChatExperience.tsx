@@ -30,9 +30,8 @@ const SAMPLE_MESSAGE: AssistantMessage = {
   id: "m1",
   html: `
   <p>Welcome to the RedPen demo.</p>
-  <p>Select any text to pop the “Ask ChatGPT” button, add a note, and it will be saved as a highlight.</p>
-  <p>You can create multiple disjoint highlights; each appears as a preview chip above the Ask box and is included when you send.</p>
-  <p>Click a highlight to edit or delete the note. Sending will bundle the notes with your prompt.</p>
+  <p>Select text, tap “Ask ChatGPT”, and add a quick note. Each highlight shows up above the Ask box.</p>
+  <p>Click a highlight to edit or delete it. When you send, your prompt and all notes are bundled together.</p>
   `,
 };
 

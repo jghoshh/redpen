@@ -46,38 +46,34 @@ export function AssistantMessageView({
 
   const handleSelection = () => {
     if (!isAnnotateMode || !contentRef.current) return;
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
 
-    if (selection.isCollapsed) {
-      onClearSelection();
-      return;
-    }
+    const run = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (selection.isCollapsed || range.collapsed) {
+        onClearSelection();
+        return;
+      }
 
-    if (
-      !contentRef.current.contains(range.startContainer) ||
-      !contentRef.current.contains(range.endContainer)
-    ) {
-      onClearSelection();
-      return;
-    }
+      const offsets = getOffsetsFromRange(contentRef.current!, range);
+      if (!offsets || offsets.start === offsets.end) {
+        onClearSelection();
+        return;
+      }
 
-    const offsets = getOffsetsFromRange(contentRef.current, range);
-    if (!offsets || offsets.start === offsets.end) {
-      onClearSelection();
-      return;
-    }
+      const rect = range.getBoundingClientRect();
+      const position = {
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX + rect.width / 2,
+      };
 
-    const rect = range.getBoundingClientRect();
-    const position = {
-      top: rect.bottom + window.scrollY + 8,
-      left: rect.left + window.scrollX + rect.width / 2,
+      const selectedText = range.toString();
+      onSelectRange(offsets, position, selectedText);
     };
 
-    const selectedText = selection.toString();
-
-    onSelectRange(offsets, position, selectedText);
+    // Defer to allow selection to settle on mobile/backwards drags
+    requestAnimationFrame(run);
   };
 
   const segments = buildSegments(messagePlainText, annotations);
@@ -124,9 +120,14 @@ function getOffsetsFromRange(
   try {
     const measure = (node: Node, offset: number) => {
       const r = document.createRange();
-      r.selectNodeContents(container);
-      r.setEnd(node, offset);
-      return r.toString().length;
+      r.setStart(container, 0);
+      try {
+        r.setEnd(node, offset);
+        return r.toString().length;
+      } catch {
+        const full = container.textContent?.length ?? 0;
+        return offset <= 0 ? 0 : full;
+      }
     };
 
     const start = measure(range.startContainer, range.startOffset);
@@ -137,6 +138,7 @@ function getOffsetsFromRange(
     return null;
   }
 }
+
 
 function buildSegments(
   text: string,
