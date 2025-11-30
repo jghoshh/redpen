@@ -125,7 +125,8 @@ h1 {
   flex-direction: column;
   gap: 10px;
   z-index: 10;
-  width: min(420px, 92vw);
+  width: min(360px, 92vw);
+  max-width: calc(100vw - 20px);
 }
 
 .inline-toolbar.toolbar-cta {
@@ -171,6 +172,46 @@ h1 {
   resize: none;
   font-size: 15px;
 }
+
+.inline-toolbar.toolbar-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(400px, 94vw);
+  max-width: calc(100vw - 24px);
+  z-index: 100;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+}
+
+.toolbar-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolbar-preview {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: #f9fafb;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.toolbar-preview-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.toolbar-preview-body {
+  font-size: 14px;
+  color: #0f172a;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
 
 .toolbar-actions {
   display: flex;
@@ -330,8 +371,20 @@ h1 {
   }
 
   .composer {
-    width: 75%;
+    width: calc(100% - 20px);
     bottom: 50px;
+  }
+
+  .inline-toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+    border-radius: 14px;
+    width: min(320px, 92vw);
+    max-width: calc(100vw - 16px);
+  }
+
+  .inline-toolbar textarea {
+    min-height: 56px;
   }
 }
 

@@ -63,6 +63,7 @@ export function ChatExperience() {
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
 
   const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
   const isAnnotateMode = true;
@@ -91,7 +92,7 @@ export function ChatExperience() {
     setSelectionError(null);
     setPendingRange(range);
     setToolbarPosition(position);
-    setToolbarMode(overlapping ? "note" : "cta");
+    setToolbarMode(isMobile || overlapping ? "note" : "cta");
     setEditingAnnotationId(overlapping ? overlapping.id : null);
     setToolbarNoteText(overlapping ? overlapping.noteText : "");
     setSelectedText(overlapping?.snippet ?? selected);
@@ -281,6 +282,15 @@ export function ChatExperience() {
   }, [toolbarPosition]);
 
   useEffect(() => {
+    const updateMobile = () => {
+      setIsMobile(window.matchMedia("(max-width: 640px)").matches);
+    };
+    updateMobile();
+    window.addEventListener("resize", updateMobile);
+    return () => window.removeEventListener("resize", updateMobile);
+  }, []);
+
+  useEffect(() => {
     const el = chatContainerRef.current;
     const sentinel = bottomRef.current;
     if (!el || !sentinel) return;
@@ -345,11 +355,11 @@ export function ChatExperience() {
             return (
               <AssistantMessageView
                 key={entry.id}
-                message={message}
-                annotations={annotations}
-                messagePlainText={messagePlainText}
-                isAnnotateMode={isAnnotateMode}
-                onSelectRange={handleSelectRange}
+        message={message}
+        annotations={annotations}
+        messagePlainText={messagePlainText}
+        isAnnotateMode={isAnnotateMode}
+        onSelectRange={handleSelectRange}
                 onClearSelection={clearSelection}
                 onAnnotationClick={focusAnnotation}
                 pulseAnnotationId={pulseAnnotationId}
@@ -379,6 +389,9 @@ export function ChatExperience() {
           isEditing={Boolean(editingAnnotationId)}
           disabled={!pendingRange}
           tooltip={selectionError}
+          isMobile={isMobile}
+          previewSnippet={selectedText}
+          onCancel={clearSelection}
         />
         <ChatComposer
           value={composerValue}
