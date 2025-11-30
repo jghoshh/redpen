@@ -144,7 +144,7 @@ function getOffsetsFromRange(
   range: Range
 ): { start: number; end: number } | null {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-  let current = walker.currentNode;
+  let current: Node | null = walker.currentNode;
   let index = 0;
   let start: number | null = null;
   let end: number | null = null;
