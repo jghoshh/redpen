@@ -52,7 +52,6 @@ export function ChatExperience() {
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState<string>("");
   const [pulseAnnotationId, setPulseAnnotationId] = useState<string | null>(null);
-  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
   const [selectedText, setSelectedText] = useState<string>("");
   type ChatEntry = {
@@ -91,7 +90,6 @@ export function ChatExperience() {
     setToolbarPosition(null);
     setToolbarNoteText("");
     setSelectionError(null);
-    setEditingAnnotationId(null);
     setToolbarMode("cta");
     setSelectedText("");
     setShowMobileModal(false);
@@ -106,20 +104,14 @@ export function ChatExperience() {
     targetMessageId: string,
     targetPlainText: string
   ) => {
-    const targetAnnotations = annotationsByMessage[targetMessageId] ?? [];
-    const overlapping = targetAnnotations.find(
-      (ann) => range.start < ann.end && range.end > ann.start
-    );
-
     setSelectionError(null);
     setPendingRange(range);
     setToolbarPosition(position);
     setActiveMessageId(targetMessageId);
     setActiveMessagePlainText(targetPlainText);
-    setToolbarMode(overlapping ? "note" : "cta");
-    setEditingAnnotationId(overlapping ? overlapping.id : null);
-    setToolbarNoteText(overlapping ? overlapping.noteText : "");
-    setSelectedText(overlapping?.snippet ?? selected);
+    setToolbarMode("cta");
+    setToolbarNoteText("");
+    setSelectedText(selected);
     setShowMobileModal(false);
   };
 
@@ -135,23 +127,8 @@ export function ChatExperience() {
         : snippetFromRange.length > 0
         ? snippetFromRange
         : "";
-
     setAnnotationsByMessage((current) => {
       const existing = current[activeMessageId] ?? [];
-      if (editingAnnotationId) {
-        return {
-          ...current,
-          [activeMessageId]: existing.map((annotation) =>
-            annotation.id === editingAnnotationId
-              ? {
-                  ...annotation,
-                  noteText: trimmed,
-                  snippet: snippet || annotation.snippet || snippetFromRange,
-                }
-              : annotation
-          ),
-        };
-      }
       const newAnnotation: Annotation = {
         id: generateId(),
         messageId: activeMessageId,
@@ -172,10 +149,6 @@ export function ChatExperience() {
     setToolbarMode("note");
   };
 
-  const deleteAnnotation = (id: string) => {
-    deleteAnnotationForMessage(activeMessageId, id);
-  };
-
   const deleteAnnotationForMessage = (messageId: string, id: string) => {
     setAnnotationsByMessage((current) => {
       const existing = current[messageId] ?? [];
@@ -183,38 +156,6 @@ export function ChatExperience() {
     });
     if (messageId === activeMessageId) {
       clearSelection();
-    }
-  };
-
-  const focusAnnotation = (id: string) => {
-    const element = document.querySelector<HTMLElement>(`[data-annotation-id="${id}"]`);
-    if (element) {
-      const rect = element.getBoundingClientRect();
-      const container = element.closest(".message-content");
-      const containerRect = container?.getBoundingClientRect();
-      const startAttr = element.getAttribute("data-char-start");
-      const endAttr = element.getAttribute("data-char-end");
-      if (!startAttr || !endAttr) return;
-      const start = Number(startAttr);
-      const end = Number(endAttr);
-      if (Number.isNaN(start) || Number.isNaN(end)) return;
-      const top =
-        rect.bottom - (containerRect?.top ?? 0) + (container?.scrollTop ?? 0) + 8;
-      const left =
-        rect.left - (containerRect?.left ?? 0) + (container?.scrollLeft ?? 0) + rect.width / 2;
-      setToolbarPosition({ top, left });
-      setPendingRange({
-        start,
-        end,
-      });
-      const annotation =
-        annotationsByMessage[activeMessageId]?.find((a) => a.id === id) ?? null;
-      setToolbarNoteText(annotation?.noteText ?? "");
-      setEditingAnnotationId(id);
-      setToolbarMode("note");
-      setSelectedText(annotation?.snippet ?? "");
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
-      setPulseAnnotationId(id);
     }
   };
 
@@ -246,7 +187,6 @@ export function ChatExperience() {
     setPendingRange(null);
     setToolbarPosition(null);
     setToolbarNoteText("");
-    setEditingAnnotationId(null);
     setSelectionError(null);
     setShowMobileModal(false);
 
@@ -300,7 +240,6 @@ export function ChatExperience() {
           setPendingRange(null);
           setToolbarPosition(null);
           setToolbarNoteText("");
-          setEditingAnnotationId(null);
           setSelectionError(null);
           setShowMobileModal(false);
           setIsSending(false);
@@ -329,7 +268,6 @@ export function ChatExperience() {
           setPendingRange(null);
           setToolbarPosition(null);
           setToolbarNoteText("");
-          setEditingAnnotationId(null);
           setSelectionError(null);
           setShowMobileModal(false);
           setIsSending(false);
@@ -432,11 +370,11 @@ export function ChatExperience() {
               annotations={annotations}
               messagePlainText={plainText}
               isAnnotateMode={isAnnotateMode}
+              pendingRange={entry.id === activeMessageId ? pendingRange : null}
               onSelectRange={(range, pos, selected) =>
                 handleSelectRange(range, pos, selected, entry.id, plainText)
               }
               onClearSelection={clearSelection}
-              onAnnotationClick={focusAnnotation}
               pulseAnnotationId={pulseAnnotationId}
             />
           );
@@ -449,17 +387,15 @@ export function ChatExperience() {
           onBeginNote={beginNote}
           onChange={setToolbarNoteText}
           onConfirm={saveAnnotation}
-          onDelete={editingAnnotationId ? () => deleteAnnotation(editingAnnotationId) : undefined}
-          isEditing={Boolean(editingAnnotationId)}
           disabled={!pendingRange}
           tooltip={selectionError}
           isMobile={isMobile}
-        previewSnippet={selectedText}
-        forceModal={showMobileModal}
-        onCancel={() => {
-          clearSelection();
-        }}
-      />
+          previewSnippet={selectedText}
+          forceModal={showMobileModal}
+          onCancel={() => {
+            clearSelection();
+          }}
+        />
         <ChatComposer
           value={composerValue}
           onChange={setComposerValue}

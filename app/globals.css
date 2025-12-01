@@ -97,6 +97,17 @@ h1 {
 
 .assistant-content {
   line-height: 1.8;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.assistant-content::selection {
+  background: rgba(0, 122, 255, 0.25);
+}
+
+.assistant-content *::selection {
+  background: rgba(0, 122, 255, 0.25);
 }
 
 .assistant-content .md-heading {
@@ -108,9 +119,9 @@ h1 {
 .assistant-content .md-h2 { font-size: 20px; }
 .assistant-content .md-h3 { font-size: 18px; }
 .assistant-content .md-p {
-  display: block;
-  margin: 4px 0 10px;
-  line-height: 1.7;
+  display: inline;
+  margin: 0;
+  line-height: inherit;
 }
 .assistant-content .md-hr {
   display: block;
@@ -231,9 +242,14 @@ h1 {
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-content: space-between;
   font-weight: 600;
   font-size: 16px;
   color: var(--text);
+}
+
+.toolbar-head .toolbar-close {
+  margin-left: auto;
 }
 
 .inline-toolbar textarea {
@@ -558,4 +574,12 @@ h1 {
   100% {
     box-shadow: 0 0 0 12px rgba(0, 0, 0, 0);
   }
+}
+
+.pending-highlight-rect {
+  position: absolute;
+  background: rgba(0, 122, 255, 0.25);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 2px;
 }

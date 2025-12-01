@@ -7,10 +7,8 @@ interface InlineNoteToolbarProps {
   onBeginNote: () => void;
   onChange: (value: string) => void;
   onConfirm: () => void;
-  onDelete?: () => void;
   disabled?: boolean;
   tooltip?: string | null;
-  isEditing?: boolean;
   isMobile?: boolean;
   previewSnippet?: string;
   onCancel?: () => void;
@@ -24,10 +22,8 @@ export function InlineNoteToolbar({
   onBeginNote,
   onChange,
   onConfirm,
-  onDelete,
   disabled = false,
   tooltip = null,
-  isEditing = false,
   isMobile = false,
   previewSnippet = "",
   onCancel,
@@ -38,11 +34,20 @@ export function InlineNoteToolbar({
   if (!showToolbar) return null;
 
   const className = `inline-toolbar${mode === "cta" ? " toolbar-cta" : ""}${isModal ? " toolbar-modal" : ""}`;
+  const keepSelection = (event: React.SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   const noteForm = (
     <>
       <div className="toolbar-head">
         <span className="toolbar-label">Ask ChatGPT</span>
+        {onCancel ? (
+          <button className="toolbar-button ghost toolbar-close" onClick={onCancel} type="button">
+            Close
+          </button>
+        ) : null}
       </div>
       {previewSnippet && isModal ? (
         <div className="toolbar-preview">
@@ -54,29 +59,27 @@ export function InlineNoteToolbar({
         placeholder="Add a note for this selection…"
         value={noteText}
         onChange={(event) => onChange(event.target.value)}
-        autoFocus={!isMobile}
+        autoFocus={false}
       />
       <div className="toolbar-actions">
-        {isEditing && onDelete ? (
-          <button className="toolbar-button ghost" onClick={onDelete} type="button">
-            Delete
-          </button>
-        ) : null}
         <button className="toolbar-button primary" onClick={onConfirm} disabled={disabled} type="button">
-          {isEditing ? "Update" : "Add Note"}
+          Add Note
         </button>
-        {isModal && onCancel ? (
-          <button className="toolbar-button ghost" onClick={onCancel} type="button">
-            Close
-          </button>
-        ) : null}
       </div>
     </>
   );
 
   const content =
     mode === "cta" && !isModal ? (
-      <button className="toolbar-button primary" onClick={onBeginNote} type="button">
+      <button
+        className="toolbar-button primary"
+        onClick={onBeginNote}
+        onMouseDown={keepSelection}
+        onPointerDown={keepSelection}
+        onTouchStart={keepSelection}
+        onMouseUp={keepSelection}
+        type="button"
+      >
         Ask ChatGPT
       </button>
     ) : (

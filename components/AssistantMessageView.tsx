@@ -1,24 +1,19 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { marked, Renderer } from "marked";
 import { Annotation, AssistantMessage } from "./types";
-
-interface SelectionPosition {
-  top: number;
-  left: number;
-}
 
 interface AssistantMessageViewProps {
   message: AssistantMessage;
   annotations: Annotation[];
   messagePlainText: string;
   isAnnotateMode: boolean;
+  pendingRange?: { start: number; end: number } | null;
   onSelectRange: (
     range: { start: number; end: number },
-    position: SelectionPosition,
+    position: { top: number; left: number },
     selectedText: string
   ) => void;
   onClearSelection: () => void;
-  onAnnotationClick: (id: string) => void;
   pulseAnnotationId?: string | null;
 }
 
@@ -27,13 +22,17 @@ export function AssistantMessageView({
   annotations,
   messagePlainText,
   isAnnotateMode,
+  pendingRange = null,
   onSelectRange,
   onClearSelection,
-  onAnnotationClick,
   pulseAnnotationId = null,
 }: AssistantMessageViewProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const markdownRenderer = useMemo(() => createInlineRenderer(), []);
+  const [pendingRects, setPendingRects] = useState<
+    { top: number; left: number; width: number; height: number }[]
+  >([]);
+  const selectionProcessedRef = useRef(false);
 
   useEffect(() => {
     if (!pulseAnnotationId || !contentRef.current) return;
@@ -46,48 +45,99 @@ export function AssistantMessageView({
     return () => clearTimeout(timeout);
   }, [pulseAnnotationId]);
 
+  useEffect(() => {
+    if (!pendingRange) {
+      setPendingRects([]);
+    }
+  }, [pendingRange]);
+
+  // Clear native selection after custom overlay is rendered to avoid double-highlight
+  useEffect(() => {
+    if (pendingRects.length > 0) {
+      requestAnimationFrame(() => {
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+      });
+    }
+  }, [pendingRects]);
+
+  const handleSelectionStart = () => {
+    selectionProcessedRef.current = false;
+  };
+
   const handleSelection = () => {
     if (!isAnnotateMode || !contentRef.current) return;
+    if (selectionProcessedRef.current) return;
 
     const run = () => {
+      if (selectionProcessedRef.current) return;
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
       const rawRange = selection.getRangeAt(0);
       if (selection.isCollapsed || rawRange.collapsed) {
+        // Don't clear if clicking on an annotation (let focusAnnotation handle it)
+        return;
+      }
+      selectionProcessedRef.current = true;
+
+      const offsets = getOffsetsFromRange(contentRef.current!, rawRange);
+      if (!offsets || offsets.start === offsets.end) {
         onClearSelection();
         return;
       }
 
-      const offsets = getOffsetsFromRange(contentRef.current!, rawRange);
-      if (!offsets || offsets.start === offsets.end) {
-        return;
-      }
+      let rect: DOMRect | null = null;
 
-      let rect: DOMRect;
+      // Try to get rect at the focus point (where selection ended)
       try {
-        const focusRange = document.createRange();
         const focusNode = selection.focusNode;
         const focusOffset = selection.focusOffset;
         if (focusNode) {
+          const focusRange = document.createRange();
           focusRange.setStart(focusNode, focusOffset);
           focusRange.collapse(true);
           const focusRects = focusRange.getClientRects();
-          rect = focusRects.length ? focusRects[focusRects.length - 1] : focusRange.getBoundingClientRect();
-        } else {
-          throw new Error("No focus node");
+          if (focusRects.length > 0) {
+            rect = focusRects[focusRects.length - 1];
+          }
         }
       } catch {
-        const clientRects = rawRange.getClientRects();
-        rect = clientRects.length
-          ? clientRects[clientRects.length - 1]
-          : rawRange.getBoundingClientRect();
+        // Ignore and try fallback
       }
+
+      // Fallback: use the last rect from the selection range
+      if (!rect || (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0)) {
+        const clientRects = rawRange.getClientRects();
+        if (clientRects.length > 0) {
+          rect = clientRects[clientRects.length - 1];
+        }
+      }
+
+      // Final fallback: use bounding rect of the entire selection
+      if (!rect || (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0)) {
+        rect = rawRange.getBoundingClientRect();
+      }
+
+      // If still invalid, bail out
+      if (!rect || (rect.top === 0 && rect.left === 0 && rect.width === 0 && rect.height === 0)) {
+        onClearSelection();
+        return;
+      }
+
       const position = {
         top: rect.bottom + window.scrollY + 6,
         left: rect.right + window.scrollX + 6,
       };
 
       const selectedText = rawRange.toString();
+      const containerRect = contentRef.current!.getBoundingClientRect();
+      const rects = Array.from(rawRange.getClientRects()).map((r) => ({
+        top: r.top - containerRect.top + (contentRef.current?.scrollTop ?? 0),
+        left: r.left - containerRect.left + (contentRef.current?.scrollLeft ?? 0),
+        width: r.width,
+        height: r.height,
+      }));
+      setPendingRects(rects);
       if (process.env.NODE_ENV === "development") {
         // eslint-disable-next-line no-console
         console.log("Selection debug", {
@@ -115,6 +165,7 @@ export function AssistantMessageView({
         <div
           ref={contentRef}
           className="message-content assistant-content"
+          onMouseDown={handleSelectionStart}
           onMouseUp={handleSelection}
           onPointerUp={handleSelection}
           onTouchEnd={() => setTimeout(handleSelection, 0)}
@@ -127,7 +178,6 @@ export function AssistantMessageView({
                 data-annotation-id={segment.annotation.id}
                 data-char-start={segment.annotation.start}
                 data-char-end={segment.annotation.end}
-                onClick={() => onAnnotationClick(segment.annotation!.id)}
                 dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(segment.text, markdownRenderer) }}
               />
             ) : (
@@ -137,6 +187,13 @@ export function AssistantMessageView({
               />
             )
           )}
+          {pendingRects.map((r, idx) => (
+            <span
+              key={`pending-rect-${idx}`}
+              className="pending-highlight-rect"
+              style={{ top: r.top, left: r.left, width: r.width, height: r.height }}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -179,10 +236,19 @@ function buildSegments(
   let cursor = 0;
 
   for (const annotation of sorted) {
-    if (annotation.start > cursor) {
-      segments.push({ text: text.slice(cursor, annotation.start) });
+    // Skip if this annotation ends before or at the cursor (already fully processed)
+    if (annotation.end <= cursor) continue;
+
+    // Calculate effective start (skip any overlapping part)
+    const effectiveStart = Math.max(annotation.start, cursor);
+
+    // Add plain text before this annotation (if any)
+    if (effectiveStart > cursor) {
+      segments.push({ text: text.slice(cursor, effectiveStart) });
     }
-    segments.push({ text: text.slice(annotation.start, annotation.end), annotation });
+
+    // Add the annotation segment (only the non-overlapping part)
+    segments.push({ text: text.slice(effectiveStart, annotation.end), annotation });
     cursor = annotation.end;
   }
 
