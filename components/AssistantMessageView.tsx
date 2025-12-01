@@ -50,6 +50,36 @@ export function AssistantMessageView({
     selectionProcessedRef.current = false;
   };
 
+  // Listen for selectionchange to catch mobile selection handle adjustments
+  useEffect(() => {
+    if (!isAnnotateMode) return;
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const handleSelectionChange = () => {
+      // Debounce to avoid firing too frequently during selection
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+
+        // Only process if selection is within our content
+        const range = selection.getRangeAt(0);
+        if (!contentRef.current?.contains(range.commonAncestorContainer)) return;
+
+        // Reset and trigger selection handler
+        selectionProcessedRef.current = false;
+        handleSelection();
+      }, 150);
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isAnnotateMode]);
+
   const handleSelection = () => {
     if (!isAnnotateMode || !contentRef.current) return;
     if (selectionProcessedRef.current) return;
@@ -149,9 +179,10 @@ export function AssistantMessageView({
           ref={contentRef}
           className="message-content assistant-content"
           onMouseDown={handleSelectionStart}
+          onTouchStart={handleSelectionStart}
           onMouseUp={handleSelection}
           onPointerUp={handleSelection}
-          onTouchEnd={() => setTimeout(handleSelection, 0)}
+          onTouchEnd={() => setTimeout(handleSelection, 100)}
           data-message-id={message.id}
         >
           <span dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(messagePlainText, markdownRenderer) }} />
