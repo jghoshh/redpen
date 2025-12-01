@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { marked, Renderer } from "marked";
-import { Annotation, AssistantMessage } from "./types";
+import { AssistantMessage } from "./types";
 
 interface AssistantMessageViewProps {
   message: AssistantMessage;
-  annotations: Annotation[];
   messagePlainText: string;
   isAnnotateMode: boolean;
   pendingRange?: { start: number; end: number } | null;
@@ -14,18 +13,15 @@ interface AssistantMessageViewProps {
     selectedText: string
   ) => void;
   onClearSelection: () => void;
-  pulseAnnotationId?: string | null;
 }
 
 export function AssistantMessageView({
   message,
-  annotations,
   messagePlainText,
   isAnnotateMode,
   pendingRange = null,
   onSelectRange,
   onClearSelection,
-  pulseAnnotationId = null,
 }: AssistantMessageViewProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const markdownRenderer = useMemo(() => createInlineRenderer(), []);
@@ -33,17 +29,6 @@ export function AssistantMessageView({
     { top: number; left: number; width: number; height: number }[]
   >([]);
   const selectionProcessedRef = useRef(false);
-
-  useEffect(() => {
-    if (!pulseAnnotationId || !contentRef.current) return;
-    const target = contentRef.current.querySelector<HTMLElement>(
-      `[data-annotation-id="${pulseAnnotationId}"]`
-    );
-    if (!target) return;
-    target.classList.add("pulse");
-    const timeout = setTimeout(() => target.classList.remove("pulse"), 1200);
-    return () => clearTimeout(timeout);
-  }, [pulseAnnotationId]);
 
   useEffect(() => {
     if (!pendingRange) {
@@ -154,8 +139,6 @@ export function AssistantMessageView({
     requestAnimationFrame(run);
   };
 
-  const segments = buildSegments(messagePlainText, annotations);
-
   return (
     <div
       className={`chat-message ${isAnnotateMode ? "annotate-mode" : ""}`}
@@ -171,22 +154,7 @@ export function AssistantMessageView({
           onTouchEnd={() => setTimeout(handleSelection, 0)}
           data-message-id={message.id}
         >
-          {segments.map((segment, index) =>
-            segment.annotation ? (
-              <span
-                key={`${segment.annotation.id}-${index}`}
-                data-annotation-id={segment.annotation.id}
-                data-char-start={segment.annotation.start}
-                data-char-end={segment.annotation.end}
-                dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(segment.text, markdownRenderer) }}
-              />
-            ) : (
-              <span
-                key={`plain-${index}`}
-                dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(segment.text, markdownRenderer) }}
-              />
-            )
-          )}
+          <span dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(messagePlainText, markdownRenderer) }} />
           {pendingRects.map((r, idx) => (
             <span
               key={`pending-rect-${idx}`}
@@ -227,37 +195,6 @@ function getOffsetsFromRange(
 }
 
 
-function buildSegments(
-  text: string,
-  annotations: Annotation[]
-): { text: string; annotation?: Annotation }[] {
-  const sorted = annotations.slice().sort((a, b) => a.start - b.start);
-  const segments: { text: string; annotation?: Annotation }[] = [];
-  let cursor = 0;
-
-  for (const annotation of sorted) {
-    // Skip if this annotation ends before or at the cursor (already fully processed)
-    if (annotation.end <= cursor) continue;
-
-    // Calculate effective start (skip any overlapping part)
-    const effectiveStart = Math.max(annotation.start, cursor);
-
-    // Add plain text before this annotation (if any)
-    if (effectiveStart > cursor) {
-      segments.push({ text: text.slice(cursor, effectiveStart) });
-    }
-
-    // Add the annotation segment (only the non-overlapping part)
-    segments.push({ text: text.slice(effectiveStart, annotation.end), annotation });
-    cursor = annotation.end;
-  }
-
-  if (cursor < text.length) {
-    segments.push({ text: text.slice(cursor) });
-  }
-
-  return segments;
-}
 
 function createInlineRenderer(): Renderer {
   const renderer = new marked.Renderer();

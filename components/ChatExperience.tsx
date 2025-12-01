@@ -51,7 +51,6 @@ export function ChatExperience() {
   const [toolbarNoteText, setToolbarNoteText] = useState("");
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState<string>("");
-  const [pulseAnnotationId, setPulseAnnotationId] = useState<string | null>(null);
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
   const [selectedText, setSelectedText] = useState<string>("");
   type ChatEntry = {
@@ -77,9 +76,7 @@ export function ChatExperience() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [showMobileModal, setShowMobileModal] = useState(false);
 
-  const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
   const isAnnotateMode = true;
-  const activeAnnotations = annotationsByMessage[activeMessageId] ?? [];
   const allAnnotations = useMemo(
     () => Object.values(annotationsByMessage).flat(),
     [annotationsByMessage]
@@ -349,7 +346,6 @@ export function ChatExperience() {
 
           const assistantHtml = entry.html ?? textToHtml(entry.content);
           const plainText = stripHtmlToPlainText(assistantHtml);
-          const annotations = annotationsByMessage[entry.id] ?? [];
 
           if (entry.pending) {
             return (
@@ -367,7 +363,6 @@ export function ChatExperience() {
             <AssistantMessageView
               key={entry.id}
               message={{ id: entry.id, html: assistantHtml }}
-              annotations={annotations}
               messagePlainText={plainText}
               isAnnotateMode={isAnnotateMode}
               pendingRange={entry.id === activeMessageId ? pendingRange : null}
@@ -375,7 +370,6 @@ export function ChatExperience() {
                 handleSelectRange(range, pos, selected, entry.id, plainText)
               }
               onClearSelection={clearSelection}
-              pulseAnnotationId={pulseAnnotationId}
             />
           );
         })}
