@@ -149,7 +149,7 @@ h1 {
   font-weight: 600;
   padding: 10px 16px;
   border-radius: 12px;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .toolbar-head {
@@ -157,7 +157,7 @@ h1 {
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text);
 }
 
@@ -170,7 +170,8 @@ h1 {
   background: transparent;
   color: var(--text);
   resize: none;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.4;
 }
 
 .inline-toolbar.toolbar-modal {
