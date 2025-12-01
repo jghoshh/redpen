@@ -57,7 +57,7 @@ h1 {
   background: transparent;
   border: none;
   box-shadow: none;
-  width: min(640px, calc(100% - 24px));
+  width: min(800px, calc(100% - 24px));
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -81,6 +81,7 @@ h1 {
   border-radius: 24px;
   padding: 16px 20px;
   background: transparent;
+  max-width: 85%;
 }
 
 .message-bubble.bubble-muted {
@@ -321,7 +322,7 @@ h1 {
   left: 50%;
   bottom: 60px;
   transform: translateX(-50%);
-  width: min(640px, calc(100% - 24px));
+  width: min(800px, calc(100% - 24px));
   margin-top: 10px;
   padding: 12px 18px 8px;
   background: #fff;
