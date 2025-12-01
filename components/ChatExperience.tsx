@@ -383,7 +383,7 @@ export function ChatExperience() {
     }
 
     return () => frames.forEach(cancelAnimationFrame);
-  }, [conversation, activeAnnotations]);
+  }, [conversation]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
