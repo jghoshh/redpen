@@ -99,6 +99,81 @@ h1 {
   line-height: 1.8;
 }
 
+.assistant-content .md-heading {
+  display: block;
+  font-weight: 700;
+  margin: 6px 0 10px;
+}
+.assistant-content .md-h1 { font-size: 22px; }
+.assistant-content .md-h2 { font-size: 20px; }
+.assistant-content .md-h3 { font-size: 18px; }
+.assistant-content .md-p {
+  display: block;
+  margin: 4px 0 10px;
+  line-height: 1.7;
+}
+.assistant-content .md-hr {
+  display: block;
+  border-top: 1px solid #e5e7eb;
+  margin: 12px 0;
+  height: 0;
+}
+.assistant-content .md-list {
+  display: block;
+  margin: 6px 0 10px 0;
+  padding-left: 18px;
+}
+.assistant-content .md-li {
+  display: list-item;
+  list-style-type: disc;
+  margin: 2px 0;
+}
+.assistant-content .md-ol .md-li {
+  list-style-type: decimal;
+}
+.assistant-content .md-code-inline {
+  font-family: ui-monospace, SFMono-Regular, SFMono, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  background: #f5f5f5;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.assistant-content .md-code-block {
+  display: block;
+  background: #f5f5f5;
+  padding: 10px 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, SFMono, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  margin: 8px 0 12px;
+}
+.assistant-content .md-quote {
+  display: block;
+  border-left: 3px solid #e5e7eb;
+  padding-left: 10px;
+  margin: 8px 0 12px;
+  color: #475569;
+}
+.assistant-content .md-table {
+  display: table;
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+}
+.assistant-content .md-thead { display: table-header-group; }
+.assistant-content .md-tbody { display: table-row-group; }
+.assistant-content .md-tr { display: table-row; }
+.assistant-content .md-td {
+  display: table-cell;
+  border: 1px solid #e5e7eb;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+.assistant-content .md-th {
+  font-weight: 700;
+  background: #f9fafb;
+}
+
 .message-content.user-content {
   line-height: 1.4;
 }

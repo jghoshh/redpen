@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
+import { marked } from "marked";
 import { Annotation, AssistantMessage } from "./types";
 
 interface SelectionPosition {
@@ -32,6 +33,7 @@ export function AssistantMessageView({
   pulseAnnotationId = null,
 }: AssistantMessageViewProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const markdownRenderer = useMemo(() => createInlineRenderer(), []);
 
   useEffect(() => {
     if (!pulseAnnotationId || !contentRef.current) return;
@@ -126,11 +128,13 @@ export function AssistantMessageView({
                 data-char-start={segment.annotation.start}
                 data-char-end={segment.annotation.end}
                 onClick={() => onAnnotationClick(segment.annotation!.id)}
-              >
-                {segment.text}
-              </span>
+                dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(segment.text, markdownRenderer) }}
+              />
             ) : (
-              <span key={`plain-${index}`}>{segment.text}</span>
+              <span
+                key={`plain-${index}`}
+                dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(segment.text, markdownRenderer) }}
+              />
             )
           )}
         </div>
@@ -187,4 +191,46 @@ function buildSegments(
   }
 
   return segments;
+}
+
+function createInlineRenderer(): marked.Renderer {
+  const renderer = new marked.Renderer();
+
+  renderer.paragraph = (text) => `<span class="md-p">${text}</span>`;
+  renderer.heading = (text, level) => `<span class="md-heading md-h${level}">${text}</span>`;
+  renderer.hr = () => `<span class="md-hr"></span>`;
+  renderer.strong = (text) => `<strong>${text}</strong>`;
+  renderer.em = (text) => `<em>${text}</em>`;
+  renderer.codespan = (text) => `<code class="md-code-inline">${escapeHtml(text)}</code>`;
+  renderer.code = (code) => `<pre class="md-code-block"><code>${escapeHtml(code)}</code></pre>`;
+  renderer.blockquote = (text) => `<span class="md-quote">${text}</span>`;
+  renderer.list = (body, ordered) =>
+    `<span class="md-list ${ordered ? "md-ol" : "md-ul"}">${body}</span>`;
+  renderer.listitem = (text) => `<span class="md-li">${text}</span>`;
+  renderer.table = (header, body) =>
+    `<span class="md-table"><span class="md-thead">${header}</span><span class="md-tbody">${body}</span></span>`;
+  renderer.tablerow = (content) => `<span class="md-tr">${content}</span>`;
+  renderer.tablecell = (content, flags) =>
+    `<span class="md-td ${flags.header ? "md-th" : ""}">${content}</span>`;
+
+  return renderer;
+}
+
+function renderInlineMarkdown(raw: string, renderer: marked.Renderer): string {
+  return marked.parse(raw, {
+    renderer,
+    gfm: true,
+    breaks: true,
+    headerIds: false,
+    mangle: false,
+  }) as string;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
