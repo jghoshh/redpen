@@ -76,6 +76,7 @@ export function ChatExperience() {
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [showMobileModal, setShowMobileModal] = useState(false);
 
   const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
   const isAnnotateMode = true;
@@ -93,6 +94,7 @@ export function ChatExperience() {
     setEditingAnnotationId(null);
     setToolbarMode("cta");
     setSelectedText("");
+    setShowMobileModal(false);
     const selection = window.getSelection();
     selection?.removeAllRanges();
   };
@@ -114,10 +116,11 @@ export function ChatExperience() {
     setToolbarPosition(position);
     setActiveMessageId(targetMessageId);
     setActiveMessagePlainText(targetPlainText);
-    setToolbarMode(isMobile || overlapping ? "note" : "cta");
+    setToolbarMode(overlapping ? "note" : "cta");
     setEditingAnnotationId(overlapping ? overlapping.id : null);
     setToolbarNoteText(overlapping ? overlapping.noteText : "");
     setSelectedText(overlapping?.snippet ?? selected);
+    setShowMobileModal(false);
   };
 
   const saveAnnotation = () => {
@@ -165,6 +168,7 @@ export function ChatExperience() {
   };
 
   const beginNote = () => {
+    setShowMobileModal(isMobile);
     setToolbarMode("note");
   };
 
@@ -431,7 +435,12 @@ export function ChatExperience() {
           tooltip={selectionError}
           isMobile={isMobile}
           previewSnippet={selectedText}
-          onCancel={clearSelection}
+          forceModal={showMobileModal}
+          onCancel={() => {
+            setShowMobileModal(false);
+            setToolbarMode("cta");
+            setPendingRange(null);
+          }}
         />
         <ChatComposer
           value={composerValue}

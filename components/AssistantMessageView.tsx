@@ -50,33 +50,51 @@ export function AssistantMessageView({
     const run = () => {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
-      const range = selection.getRangeAt(0);
-      if (selection.isCollapsed || range.collapsed) {
+      const rawRange = selection.getRangeAt(0);
+      if (selection.isCollapsed || rawRange.collapsed) {
         onClearSelection();
         return;
       }
 
-      if (
-        !contentRef.current!.contains(range.startContainer) ||
-        !contentRef.current!.contains(range.endContainer)
-      ) {
-        onClearSelection();
-        return;
-      }
-
-      const offsets = getOffsetsFromRange(contentRef.current!, range);
+      const offsets = getOffsetsFromRange(contentRef.current!, rawRange);
       if (!offsets || offsets.start === offsets.end) {
-        onClearSelection();
         return;
       }
 
-      const rect = range.getBoundingClientRect();
+      let rect: DOMRect;
+      try {
+        const focusRange = document.createRange();
+        const focusNode = selection.focusNode;
+        const focusOffset = selection.focusOffset;
+        if (focusNode) {
+          focusRange.setStart(focusNode, focusOffset);
+          focusRange.collapse(true);
+          const focusRects = focusRange.getClientRects();
+          rect = focusRects.length ? focusRects[focusRects.length - 1] : focusRange.getBoundingClientRect();
+        } else {
+          throw new Error("No focus node");
+        }
+      } catch {
+        const clientRects = rawRange.getClientRects();
+        rect = clientRects.length
+          ? clientRects[clientRects.length - 1]
+          : rawRange.getBoundingClientRect();
+      }
       const position = {
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX + rect.width / 2,
+        top: rect.bottom + window.scrollY + 6,
+        left: rect.right + window.scrollX + 6,
       };
 
-      const selectedText = range.toString();
+      const selectedText = rawRange.toString();
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.log("Selection debug", {
+          selectedText,
+          anchor: rect,
+          offsets,
+        });
+      }
+
       onSelectRange(offsets, position, selectedText);
     };
 
