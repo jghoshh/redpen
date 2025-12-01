@@ -39,7 +39,13 @@ const HELLO_TEXT = "hello, is this the chat redpen demo?";
 
 export function ChatExperience() {
   const [message, setMessage] = useState<AssistantMessage>(SAMPLE_MESSAGE);
-  const [annotations, setAnnotations] = useState<Annotation[]>(message.annotations ?? []);
+  const [activeMessageId, setActiveMessageId] = useState<string>(SAMPLE_MESSAGE.id);
+  const [activeMessagePlainText, setActiveMessagePlainText] = useState<string>(
+    stripHtmlToPlainText(SAMPLE_MESSAGE.html)
+  );
+  const [annotationsByMessage, setAnnotationsByMessage] = useState<Record<string, Annotation[]>>({
+    [SAMPLE_MESSAGE.id]: SAMPLE_MESSAGE.annotations ?? [],
+  });
   const [pendingRange, setPendingRange] = useState<{ start: number; end: number } | null>(null);
   const [toolbarPosition, setToolbarPosition] = useState<{ top: number; left: number } | null>(null);
   const [toolbarNoteText, setToolbarNoteText] = useState("");
@@ -53,11 +59,17 @@ export function ChatExperience() {
     id: string;
     role: "user" | "assistant";
     content: string;
+    html?: string;
     pending?: boolean;
     createdAt?: number;
   };
   const [conversation, setConversation] = useState<ChatEntry[]>([
-    { id: SAMPLE_MESSAGE.id, role: "assistant", content: stripHtmlToPlainText(SAMPLE_MESSAGE.html) },
+    {
+      id: SAMPLE_MESSAGE.id,
+      role: "assistant",
+      content: stripHtmlToPlainText(SAMPLE_MESSAGE.html),
+      html: SAMPLE_MESSAGE.html,
+    },
   ]);
   const [isSending, setIsSending] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -67,6 +79,7 @@ export function ChatExperience() {
 
   const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
   const isAnnotateMode = true;
+  const activeAnnotations = annotationsByMessage[activeMessageId] ?? [];
 
   const clearSelection = () => {
     setPendingRange(null);
@@ -83,15 +96,20 @@ export function ChatExperience() {
   const handleSelectRange = (
     range: { start: number; end: number },
     position: { top: number; left: number },
-    selected: string
+    selected: string,
+    targetMessageId: string,
+    targetPlainText: string
   ) => {
-    const overlapping = annotations.find(
+    const targetAnnotations = annotationsByMessage[targetMessageId] ?? [];
+    const overlapping = targetAnnotations.find(
       (ann) => range.start < ann.end && range.end > ann.start
     );
 
     setSelectionError(null);
     setPendingRange(range);
     setToolbarPosition(position);
+    setActiveMessageId(targetMessageId);
+    setActiveMessagePlainText(targetPlainText);
     setToolbarMode(isMobile || overlapping ? "note" : "cta");
     setEditingAnnotationId(overlapping ? overlapping.id : null);
     setToolbarNoteText(overlapping ? overlapping.noteText : "");
@@ -103,37 +121,42 @@ export function ChatExperience() {
     const trimmed = toolbarNoteText.trim();
     const snippetFromSelection = selectedText.trim();
     const snippetFromRange =
-      pendingRange ? messagePlainText.slice(pendingRange.start, pendingRange.end) : "";
+      pendingRange ? activeMessagePlainText.slice(pendingRange.start, pendingRange.end) : "";
     const snippet =
       snippetFromSelection.length > 0
         ? snippetFromSelection
         : snippetFromRange.length > 0
         ? snippetFromRange
         : "";
-    if (editingAnnotationId) {
-      setAnnotations((current) =>
-        current.map((annotation) =>
-          annotation.id === editingAnnotationId
-            ? {
-                ...annotation,
-                noteText: trimmed,
-                snippet: snippet || annotation.snippet || snippetFromRange,
-              }
-            : annotation
-        )
-      );
-    } else {
+
+    setAnnotationsByMessage((current) => {
+      const existing = current[activeMessageId] ?? [];
+      if (editingAnnotationId) {
+        return {
+          ...current,
+          [activeMessageId]: existing.map((annotation) =>
+            annotation.id === editingAnnotationId
+              ? {
+                  ...annotation,
+                  noteText: trimmed,
+                  snippet: snippet || annotation.snippet || snippetFromRange,
+                }
+              : annotation
+          ),
+        };
+      }
       const newAnnotation: Annotation = {
         id: generateId(),
-        messageId: message.id,
+        messageId: activeMessageId,
         start: pendingRange.start,
         end: pendingRange.end,
         noteText: trimmed,
         snippet,
         createdAt: Date.now(),
       };
-      setAnnotations((current) => [...current, newAnnotation]);
-    }
+      return { ...current, [activeMessageId]: [...existing, newAnnotation] };
+    });
+
     clearSelection();
   };
 
@@ -142,7 +165,10 @@ export function ChatExperience() {
   };
 
   const deleteAnnotation = (id: string) => {
-    setAnnotations((current) => current.filter((annotation) => annotation.id !== id));
+    setAnnotationsByMessage((current) => {
+      const existing = current[activeMessageId] ?? [];
+      return { ...current, [activeMessageId]: existing.filter((annotation) => annotation.id !== id) };
+    });
     clearSelection();
   };
 
@@ -167,7 +193,8 @@ export function ChatExperience() {
         start,
         end,
       });
-      const annotation = annotations.find((a) => a.id === id);
+      const annotation =
+        annotationsByMessage[activeMessageId]?.find((a) => a.id === id) ?? null;
       setToolbarNoteText(annotation?.noteText ?? "");
       setEditingAnnotationId(id);
       setToolbarMode("note");
@@ -181,15 +208,15 @@ export function ChatExperience() {
     if (isSending) return;
     const userText = composerValue.trim();
     const noteContext =
-      annotations.length > 0
-        ? annotations
+      activeAnnotations.length > 0
+        ? activeAnnotations
             .slice()
             .sort((a, b) => a.start - b.start)
             .map((ann, idx) => {
               const snippet =
                 ann.snippet && ann.snippet.length
                   ? ann.snippet
-                  : messagePlainText.slice(ann.start, ann.end);
+                  : activeMessagePlainText.slice(ann.start, ann.end);
               const note = ann.noteText.trim();
               return `${idx + 1}) "${snippet}"${note ? ` — ${note}` : ""}`;
             })
@@ -242,7 +269,12 @@ export function ChatExperience() {
             )
           );
           setMessage(newMessage);
-          setAnnotations([]);
+          setActiveMessageId(newMessage.id);
+          setActiveMessagePlainText(stripHtmlToPlainText(newMessage.html));
+          setAnnotationsByMessage((current) => ({
+            ...current,
+            [newMessage.id]: current[newMessage.id] ?? [],
+          }));
           setToolbarMode("cta");
           setSelectedText("");
           setIsSending(false);
@@ -262,6 +294,13 @@ export function ChatExperience() {
                 : entry
             )
           );
+          setMessage({ id: pendingAssistant.id, html: textToHtml(fallback) });
+          setActiveMessageId(pendingAssistant.id);
+          setActiveMessagePlainText(fallback);
+          setAnnotationsByMessage((current) => ({
+            ...current,
+            [pendingAssistant.id]: current[pendingAssistant.id] ?? [],
+          }));
           setIsSending(false);
         };
         const elapsed = Date.now() - pendingCreatedAt;
@@ -313,7 +352,7 @@ export function ChatExperience() {
     }
 
     return () => frames.forEach(cancelAnimationFrame);
-  }, [conversation, annotations]);
+  }, [conversation, activeAnnotations]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -339,6 +378,10 @@ export function ChatExperience() {
             );
           }
 
+          const assistantHtml = entry.html ?? textToHtml(entry.content);
+          const plainText = stripHtmlToPlainText(assistantHtml);
+          const annotations = annotationsByMessage[entry.id] ?? [];
+
           if (entry.pending) {
             return (
               <div className="chat-message" key={entry.id}>
@@ -351,30 +394,20 @@ export function ChatExperience() {
             );
           }
 
-          if (entry.id === message.id) {
-            return (
-              <AssistantMessageView
-                key={entry.id}
-        message={message}
-        annotations={annotations}
-        messagePlainText={messagePlainText}
-        isAnnotateMode={isAnnotateMode}
-        onSelectRange={handleSelectRange}
-                onClearSelection={clearSelection}
-                onAnnotationClick={focusAnnotation}
-                pulseAnnotationId={pulseAnnotationId}
-              />
-            );
-          }
-
           return (
-            <div className="chat-message" key={entry.id}>
-              <div className="message-bubble">
-                <div className="message-content assistant-content" style={{ whiteSpace: "pre-line" }}>
-                  {entry.content}
-                </div>
-              </div>
-            </div>
+            <AssistantMessageView
+              key={entry.id}
+              message={{ id: entry.id, html: assistantHtml }}
+              annotations={annotations}
+              messagePlainText={plainText}
+              isAnnotateMode={isAnnotateMode}
+              onSelectRange={(range, pos, selected) =>
+                handleSelectRange(range, pos, selected, entry.id, plainText)
+              }
+              onClearSelection={clearSelection}
+              onAnnotationClick={focusAnnotation}
+              pulseAnnotationId={pulseAnnotationId}
+            />
           );
         })}
         <div ref={bottomRef} />
@@ -398,8 +431,8 @@ export function ChatExperience() {
           onChange={setComposerValue}
           onSend={sendPrompt}
           textareaRef={composerRef}
-          annotations={annotations}
-          messagePlainText={messagePlainText}
+          annotations={activeAnnotations}
+          messagePlainText={activeMessagePlainText}
           onDeleteAnnotation={deleteAnnotation}
           isSending={isSending}
         />
