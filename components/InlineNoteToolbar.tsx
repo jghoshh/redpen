@@ -54,7 +54,7 @@ export function InlineNoteToolbar({
         placeholder="Add a note for this selection…"
         value={noteText}
         onChange={(event) => onChange(event.target.value)}
-        autoFocus
+        autoFocus={!isMobile}
       />
       <div className="toolbar-actions">
         {isEditing && onDelete ? (
