@@ -23,8 +23,6 @@ export function ChatComposer({
     text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
 
   const buildPreview = (annotation: {
-    start: number;
-    end: number;
     noteText: string;
     snippet?: string;
   }): { snippet: string; note: string } => {
@@ -43,7 +41,6 @@ export function ChatComposer({
         <div className="composer-previews">
           {annotations
             .slice()
-            .sort((a, b) => a.start - b.start)
             .map((annotation) => (
               <div className="composer-chip" key={annotation.id}>
                 <span aria-hidden className="chip-icon">↩</span>
