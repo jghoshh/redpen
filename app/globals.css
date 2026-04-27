@@ -665,3 +665,10 @@ h1 {
 .composer .send-circle:hover {
   background: #525252;
 }
+
+.composer .send-circle:disabled {
+  cursor: not-allowed;
+  background: #d1d5db;
+  color: #6b7280;
+  box-shadow: none;
+}

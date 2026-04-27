@@ -19,6 +19,7 @@ export function ChatComposer({
   onDeleteAnnotation,
   isSending = false,
 }: ChatComposerProps) {
+  const canSend = value.trim().length > 0 && !isSending;
   const truncate = (text: string, limit: number) =>
     text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
 
@@ -75,7 +76,9 @@ export function ChatComposer({
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              onSend();
+              if (canSend) {
+                onSend();
+              }
             }
           }}
           placeholder="Ask anything..."
@@ -86,7 +89,7 @@ export function ChatComposer({
             onClick={onSend}
             type="button"
             aria-label="Send"
-            disabled={isSending}
+            disabled={!canSend}
           >
             ↑
           </button>

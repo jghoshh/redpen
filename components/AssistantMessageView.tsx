@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef } from "react";
+import React, { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { marked, Renderer } from "marked";
 import { AssistantMessage } from "./types";
 
@@ -46,7 +46,7 @@ export function AssistantMessageView({
     selectionProcessedRef.current = false;
   };
 
-  const handleSelection = () => {
+  const handleSelection = useCallback(() => {
     if (!isAnnotateMode || !contentRef.current) return;
     if (selectionProcessedRef.current) return;
 
@@ -57,6 +57,9 @@ export function AssistantMessageView({
       const rawRange = selection.getRangeAt(0);
       if (selection.isCollapsed || rawRange.collapsed) {
         // Don't clear if clicking on an annotation (let focusAnnotation handle it)
+        return;
+      }
+      if (!rangeIntersectsNode(rawRange, contentRef.current!)) {
         return;
       }
       selectionProcessedRef.current = true;
@@ -125,7 +128,25 @@ export function AssistantMessageView({
 
     // Defer to allow selection to settle on mobile/backwards drags
     requestAnimationFrame(run);
-  };
+  }, [isAnnotateMode, onClearSelection, onSelectRange]);
+
+  useLayoutEffect(() => {
+    if (!isAnnotateMode) return;
+
+    const resetSelectionProcessing = () => {
+      selectionProcessedRef.current = false;
+    };
+
+    document.addEventListener("mousedown", resetSelectionProcessing);
+    document.addEventListener("pointerup", handleSelection);
+    document.addEventListener("mouseup", handleSelection);
+
+    return () => {
+      document.removeEventListener("mousedown", resetSelectionProcessing);
+      document.removeEventListener("pointerup", handleSelection);
+      document.removeEventListener("mouseup", handleSelection);
+    };
+  }, [handleSelection, isAnnotateMode]);
 
   return (
     <div
@@ -137,14 +158,25 @@ export function AssistantMessageView({
           ref={contentRef}
           className="message-content assistant-content"
           onMouseDown={handleSelectionStart}
-          onMouseUp={handleSelection}
-          onPointerUp={handleSelection}
           data-message-id={message.id}
         >
           <span dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(messagePlainText, markdownRenderer) }} />
         </div>
       </div>
     </div>
+  );
+}
+
+function rangeIntersectsNode(range: Range, node: Node) {
+  if (typeof range.intersectsNode === "function") {
+    return range.intersectsNode(node);
+  }
+
+  const nodeRange = document.createRange();
+  nodeRange.selectNodeContents(node);
+  return (
+    range.compareBoundaryPoints(Range.END_TO_START, nodeRange) < 0 &&
+    range.compareBoundaryPoints(Range.START_TO_END, nodeRange) > 0
   );
 }
 

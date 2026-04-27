@@ -31,15 +31,14 @@ function truncateText(text: string, limit: number) {
   return trimmed.length > limit ? `${trimmed.slice(0, limit - 1).trimEnd()}…` : trimmed;
 }
 
-/**
- * Formats the user's message with highlighted context using XML-style tags.
- * This follows RAG best practices by:
- * 1. Clearly separating context (highlights) from the user's query
- * 2. Using semantic XML tags that LLMs understand well
- * 3. Preserving the relationship between excerpts and user annotations
- */
-function formatMessageWithContext(userText: string, annotations: Annotation[]): string {
-  const hasHighlights = annotations.length > 0;
+function formatUserPromptForApi(userText: string, annotations: Annotation[]): string {
+  const usableAnnotations = annotations
+    .map((ann) => ({
+      excerpt: ann.snippet?.trim() || "",
+      note: ann.noteText?.trim() || "",
+    }))
+    .filter((ann) => ann.excerpt || ann.note);
+  const hasHighlights = usableAnnotations.length > 0;
   const hasUserText = userText.length > 0;
 
   if (!hasHighlights && !hasUserText) {
@@ -51,45 +50,29 @@ function formatMessageWithContext(userText: string, annotations: Annotation[]): 
     return userText;
   }
 
-  // Build the highlighted context section
-  const highlightEntries = annotations
-    .map((ann) => {
-      const excerpt = ann.snippet?.trim() || "";
-      const note = ann.noteText?.trim() || "";
+  const contextBlocks = usableAnnotations.map((ann, index) => {
+    const lines = [`${index + 1}. Selected excerpt:`];
+    if (ann.excerpt) {
+      lines.push(indentBlock(ann.excerpt));
+    }
+    if (ann.note) {
+      lines.push("User note about this excerpt:");
+      lines.push(indentBlock(ann.note));
+    }
+    return lines.join("\n");
+  });
 
-      if (!excerpt && !note) return null;
+  return [
+    `User query:\n${userText}`,
+    `Selected context excerpts:\n${contextBlocks.join("\n\n")}`,
+  ].join("\n\n");
+}
 
-      let entry = "<highlight>\n";
-      if (excerpt) {
-        entry += `<excerpt>${excerpt}</excerpt>\n`;
-      }
-      if (note) {
-        entry += `<annotation>${note}</annotation>\n`;
-      }
-      entry += "</highlight>";
-      return entry;
-    })
-    .filter(Boolean);
-
-  if (highlightEntries.length === 0 && !hasUserText) {
-    return "";
-  }
-
-  const parts: string[] = [];
-
-  // Add context section if there are highlights
-  if (highlightEntries.length > 0) {
-    parts.push(
-      `<highlighted_context>\n${highlightEntries.join("\n")}\n</highlighted_context>`
-    );
-  }
-
-  // Add user query section
-  if (hasUserText) {
-    parts.push(`<user_query>\n${userText}\n</user_query>`);
-  }
-
-  return parts.join("\n\n");
+function indentBlock(text: string) {
+  return text
+    .split("\n")
+    .map((line) => `   ${line}`)
+    .join("\n");
 }
 
 const SAMPLE_MESSAGE: AssistantMessage = {
@@ -131,6 +114,7 @@ export function ChatExperience() {
     contextPreviews?: UserContextPreview[];
     html?: string;
     pending?: boolean;
+    isDemo?: boolean;
     createdAt?: number;
   };
   const [conversation, setConversation] = useState<ChatEntry[]>([
@@ -139,6 +123,7 @@ export function ChatExperience() {
       role: "assistant",
       content: stripHtmlToPlainText(SAMPLE_MESSAGE.html),
       html: SAMPLE_MESSAGE.html,
+      isDemo: true,
     },
   ]);
   const [isSending, setIsSending] = useState(false);
@@ -228,7 +213,9 @@ export function ChatExperience() {
   const sendPrompt = () => {
     if (isSending) return;
     const userText = composerValue.trim();
-    const fullUserMessage = formatMessageWithContext(userText, allAnnotations);
+    if (!userText) return;
+
+    const fullUserMessage = formatUserPromptForApi(userText, allAnnotations);
 
     if (!fullUserMessage) return;
 
@@ -249,7 +236,7 @@ export function ChatExperience() {
       id: userEntryId,
       role: "user",
       content: fullUserMessage,
-      displayContent: userText || "Ask about the selected context",
+      displayContent: userText,
       contextPreviews,
     };
     const pendingCreatedAt = Date.now();
@@ -270,7 +257,12 @@ export function ChatExperience() {
     setComposerValue("");
     setIsSending(true);
 
-    const apiConversation = [...conversation, { role: "user" as const, content: fullUserMessage }];
+    const apiConversation = [
+      ...conversation
+        .filter((entry) => !entry.pending && !entry.isDemo)
+        .map((entry) => ({ role: entry.role, content: entry.content })),
+      { role: "user" as const, content: fullUserMessage },
+    ];
 
     fetch("/api/chat", {
       method: "POST",
